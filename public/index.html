@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processador de Imagens</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="container">
+    <h1>Analisar Imagem de Comprovante</h1>
+    <form id="uploadForm">
+      <input type="file" id="imageInput" accept="image/png, image/jpeg" required>
+      <button type="submit" id="submitButton">Processar Imagem</button>
+    </form>
+    <div id="result" class="hidden">
+      <h2>Resultado:</h2>
+      <pre id="jsonResult"></pre>
+    </div>
+    <div id="loading" class="hidden">Processando...</div>
+  </div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('imageInput');
+      const file = fileInput.files[0];
+
+      const button = document.getElementById('submitButton');
+      button.disabled = true;
+      button.textContent = 'Processando...';
+
+      if (!file) {
+        alert('Selecione uma imagem!');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('invoice', file);
+
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('result').classList.add('hidden');
+
+      try {
+        const response = await fetch('/analyze-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const result = await response.json();
+
+        if (result) {
+          const formattedData = JSON.stringify(result, null, 2);
+          document.getElementById('jsonResult').textContent = formattedData;
+          document.getElementById('result').classList.remove('hidden');
+        } else {
+          throw new Error('Resposta da API não contém dados válidos.');
+        }
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      } finally {
+        document.getElementById('loading').classList.add('hidden');
+        button.disabled = false;
+        button.textContent = 'Processar Imagem';
+      }
+    });
+  </script>
+</body>
+
+</html>

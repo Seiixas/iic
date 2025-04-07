@@ -30,7 +30,8 @@
 
     <section id="result" class="hidden" aria-labelledby="result-title">
       <h2 id="result-title">Resultado</h2>
-      <pre id="jsonResult" tabindex="0"></pre>
+      <div id="structuredResult" tabindex="0"></div>
+
     </section>
   </main>
 
@@ -53,10 +54,13 @@
       formData.append('invoice', file);
 
       const loadingSection = document.getElementById('loading');
+      const resultSection = document.getElementById('result');
+      const structuredResult = document.getElementById('structuredResult');
+
       loadingSection.classList.remove('hidden');
       loadingSection.classList.add('visible');
-
-      document.getElementById('result').classList.add('hidden');
+      resultSection.classList.add('hidden');
+      resultSection.classList.remove('visible', 'error');
 
       try {
         const response = await fetch('/analyze-image', {
@@ -65,20 +69,51 @@
         });
 
         if (!response.ok) {
-          throw new Error(await response.text());
+          const errorText = await response.text();
+          console.error("❌ Erro na resposta da API:", errorText);
+          throw new Error(errorText);
         }
 
         const result = await response.json();
+        console.log("📦 Resultado recebido:", result);
 
-        if (result) {
-          const formattedData = JSON.stringify(result, null, 2);
-          document.getElementById('jsonResult').textContent = formattedData;
-          document.getElementById('result').classList.remove('hidden');
-        } else {
-          throw new Error('Resposta da API não contém dados válidos.');
+        structuredResult.innerHTML = '';
+
+        const camposInvalidos = (
+          !result.estabelecimento &&
+          !result.data &&
+          (!result.itens || result.itens.length === 0) &&
+          (result.valor_total === null || result.valor_total === undefined)
+        );
+
+        if (camposInvalidos) {
+          resultSection.classList.remove('hidden');
+          resultSection.classList.add('error');
+          structuredResult.innerHTML = `
+            <p><strong>⚠️ Não foi possível reconhecer um comprovante válido.</strong></p>
+            <p>Verifique se a imagem está legível e contém todas as informações necessárias.</p>
+          `;
+          return;
         }
+
+        resultSection.classList.remove('hidden', 'error');
+        resultSection.classList.add('visible');
+
+        structuredResult.innerHTML = `
+          <p><strong>Estabelecimento:</strong> ${result.estabelecimento ? result.estabelecimento : 'Não identificado'}</p>
+          <p><strong>Data:</strong> ${result.data ? result.data : 'Não identificada'}</p>
+          <p><strong>Valor Total:</strong> R$ ${result.valor_total ? result.valor_total.toFixed(2) : 'Não identificado'}</p>
+          <h3>Itens:</h3>
+          <ul>
+            ${result.itens.map(item => `
+              <li>${item.quantidade}x ${item.item} - R$ ${item.preco.toFixed(2)}</li>
+            `).join('')}
+          </ul>
+        `;
       } catch (error) {
-        alert(`Erro: ${error.message}`);
+        console.error("❌ Erro ao processar resposta:", error);
+        alert(`Erro ao processar resposta da API. Verifique o console para mais detalhes.`);
+        resultSection.classList.remove('hidden');
       } finally {
         loadingSection.classList.add('hidden');
         loadingSection.classList.remove('visible');
@@ -87,6 +122,7 @@
       }
     });
   </script>
+
 </body>
 
 </html>
